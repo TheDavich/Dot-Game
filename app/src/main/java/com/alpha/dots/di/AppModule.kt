@@ -1,9 +1,15 @@
 package com.alpha.dots.di
 
 import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.dataStoreFile
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.Preferences
 import com.alpha.dots.Application
+import com.alpha.dots.ui.viewModel.SettingsViewModel
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.firestore.FirebaseFirestore
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -20,8 +26,22 @@ object AppModule {
 
     @Singleton
     @Provides
+    fun provideDataStore(@ApplicationContext context: Context): DataStore<Preferences> {
+        return PreferenceDataStoreFactory.create(
+            produceFile = { context.dataStoreFile("settings.preferences_pb") }
+        )
+    }
+
+    @Singleton
+    @Provides
     fun provideFirebaseDatabase(): FirebaseDatabase {
         return FirebaseDatabase.getInstance()
+    }
+
+    @Singleton
+    @Provides
+    fun provideFirebaseFirestore(): FirebaseFirestore {
+        return FirebaseFirestore.getInstance()
     }
 
     @Singleton
@@ -44,5 +64,14 @@ object AppModule {
     @Provides
     fun provideApplication(@ApplicationContext appContext: Context): Application {
         return appContext as Application
+    }
+
+    @Provides
+    @Singleton
+    fun provideSettingsViewModel(
+        @ApplicationContext context: Context,
+        dataStore: DataStore<Preferences>
+    ): SettingsViewModel {
+        return SettingsViewModel(context, dataStore)
     }
 }

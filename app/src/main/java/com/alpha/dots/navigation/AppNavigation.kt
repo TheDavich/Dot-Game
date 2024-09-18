@@ -5,18 +5,19 @@ import androidx.compose.animation.ExitTransition
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.navigation.NavController
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
 import com.alpha.dots.ui.screens.GameOverScreen
 import com.alpha.dots.ui.screens.GameScreen
 import com.alpha.dots.ui.screens.MainMenu
+import com.alpha.dots.ui.screens.SettingsScreen
 import com.alpha.dots.ui.viewModel.GameViewModel
-import com.alpha.dots.util.MainMenuScreen
-import com.alpha.dots.util.SinglePlayerGameOverScreen
-import com.alpha.dots.util.SinglePlayerGameScreen
+import com.alpha.dots.ui.viewModel.SettingsViewModel
+import com.alpha.dots.util.MAIN_MENU_SCREEN
+import com.alpha.dots.util.SETTINGS_SCREEN
+import com.alpha.dots.util.SINGLE_PLAYER_GAME_OVER_SCREEN
+import com.alpha.dots.util.SINGLE_PLAYER_GAME_SCREEN
 
 @Composable
 fun AppNavigation(
@@ -24,15 +25,16 @@ fun AppNavigation(
     navController: NavHostController
 ) {
     val viewModel: GameViewModel = hiltViewModel()
+    val settingsViewModel: SettingsViewModel = hiltViewModel()
     NavHost(
         navController = navController,
-        startDestination = MainMenuScreen,
+        startDestination = MAIN_MENU_SCREEN,
         modifier = modifier,
         enterTransition = { EnterTransition.None },
         exitTransition = { ExitTransition.None },
     ) {
         composable(
-            route = MainMenuScreen,
+            route = MAIN_MENU_SCREEN,
             enterTransition = { EnterTransition.None} ,
             exitTransition = {ExitTransition.None} ,
         ) {
@@ -42,23 +44,33 @@ fun AppNavigation(
             )
         }
         composable(
-            route = SinglePlayerGameScreen,
+            route = SINGLE_PLAYER_GAME_SCREEN,
             enterTransition = {EnterTransition.None} ,
             exitTransition = {ExitTransition.None} ,
         ) {
             GameScreen(
                 viewModel = viewModel,
-                navController = navController
+                navController = navController,
+                settingsViewModel = settingsViewModel
             )
         }
         composable(
-            route = SinglePlayerGameOverScreen,
+            route = SINGLE_PLAYER_GAME_OVER_SCREEN,
             enterTransition = {EnterTransition.None} ,
             exitTransition = {ExitTransition.None} ,
         ) {
             GameOverScreen(
                 viewModel = viewModel,
                 navController = navController,
+            )
+        }
+        composable(
+            route = SETTINGS_SCREEN,
+            enterTransition = {EnterTransition.None} ,
+            exitTransition = {ExitTransition.None} ,
+        ) {
+            SettingsScreen(
+                viewModel = settingsViewModel,
             )
         }
     }

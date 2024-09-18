@@ -1,9 +1,10 @@
 package com.alpha.dots.ui.screens
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -14,7 +15,9 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.alpha.dots.ui.composables.UniversalButton
 import com.alpha.dots.ui.viewModel.GameViewModel
-import com.alpha.dots.util.SinglePlayerGameScreen
+import com.alpha.dots.util.MULTIPLAYER_GAME_SCREEN
+import com.alpha.dots.util.SETTINGS_SCREEN
+import com.alpha.dots.util.SINGLE_PLAYER_GAME_SCREEN
 
 @Composable
 fun MainMenu(
@@ -23,19 +26,34 @@ fun MainMenu(
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
-        modifier = modifier
-            .fillMaxSize(),
-        containerColor = Color.Black
+        modifier = modifier.fillMaxSize(),
+        containerColor = Color.Black,
+        topBar = {
+            Row(
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = modifier
+                    .fillMaxWidth()
+                    .padding(end = 16.dp)
+                    .statusBarsPadding()
+                    .clickable {
+                        navController.navigate(SETTINGS_SCREEN)
+                    }
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "Settings",
+                    tint = Color.White
+                )
+            }
+        }
     ) { innerPadding ->
         MainMenuScreenContent(
             onSinglePlayerClicked = {
-                navController.navigate(SinglePlayerGameScreen)
+                viewModel.resetGameState()
+                navController.navigate(SINGLE_PLAYER_GAME_SCREEN)
             },
-            onMatchmakingClicked = {
-                /* Navigate to Matchmaking */
-            },
-            modifier = modifier
-                .padding(innerPadding)
+            modifier = modifier.padding(innerPadding)
         )
     }
 }
@@ -43,7 +61,6 @@ fun MainMenu(
 @Composable
 fun MainMenuScreenContent(
     onSinglePlayerClicked: () -> Unit,
-    onMatchmakingClicked: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -58,10 +75,6 @@ fun MainMenuScreenContent(
             onClick = onSinglePlayerClicked
         )
         UniversalButton(
-            text = "Matchmaking",
-            onClick = onMatchmakingClicked
-        )
-        UniversalButton(
             text = "Rankings",
             onClick = { /* Navigate to Rankings */ }
         )
@@ -73,6 +86,5 @@ fun MainMenuScreenContent(
 fun MainMenuPreview() {
     MainMenuScreenContent(
         onSinglePlayerClicked = { /* Handle singleplayer click */ },
-        onMatchmakingClicked = { /* Handle matchmaking click */ }
     )
 }
