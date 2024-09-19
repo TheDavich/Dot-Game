@@ -1,5 +1,7 @@
 package com.alpha.dots.navigation
 
+import android.content.Intent
+import androidx.activity.result.ActivityResultLauncher
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.runtime.Composable
@@ -13,6 +15,7 @@ import com.alpha.dots.ui.screens.GameScreen
 import com.alpha.dots.ui.screens.MainMenu
 import com.alpha.dots.ui.screens.SettingsScreen
 import com.alpha.dots.ui.viewModel.GameViewModel
+import com.alpha.dots.ui.viewModel.LoginViewModel
 import com.alpha.dots.ui.viewModel.SettingsViewModel
 import com.alpha.dots.util.MAIN_MENU_SCREEN
 import com.alpha.dots.util.SETTINGS_SCREEN
@@ -22,10 +25,12 @@ import com.alpha.dots.util.SINGLE_PLAYER_GAME_SCREEN
 @Composable
 fun AppNavigation(
     modifier: Modifier = Modifier,
-    navController: NavHostController
+    navController: NavHostController,
+    signInLauncher: ActivityResultLauncher<Intent>
 ) {
     val viewModel: GameViewModel = hiltViewModel()
     val settingsViewModel: SettingsViewModel = hiltViewModel()
+    val loginViewModel: LoginViewModel = hiltViewModel()
     NavHost(
         navController = navController,
         startDestination = MAIN_MENU_SCREEN,
@@ -41,6 +46,8 @@ fun AppNavigation(
             MainMenu(
                 viewModel = viewModel,
                 navController = navController,
+                loginViewModel = loginViewModel,
+                signInLauncher = signInLauncher // Pass the launcher to MainMenu
             )
         }
         composable(

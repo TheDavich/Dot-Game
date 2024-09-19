@@ -6,6 +6,7 @@ import androidx.datastore.dataStoreFile
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import com.alpha.dots.Application
+import com.alpha.dots.ui.viewModel.LoginViewModel
 import com.alpha.dots.ui.viewModel.SettingsViewModel
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
@@ -73,5 +74,15 @@ object AppModule {
         dataStore: DataStore<Preferences>
     ): SettingsViewModel {
         return SettingsViewModel(context, dataStore)
+    }
+
+    @Provides
+    @Singleton
+    fun provideLoginViewModel(
+        application: Application,
+        firebaseAuth: FirebaseAuth,
+        firebaseFirestore: FirebaseFirestore
+    ): LoginViewModel {
+        return LoginViewModel(application, firebaseAuth, firebaseFirestore)
     }
 }

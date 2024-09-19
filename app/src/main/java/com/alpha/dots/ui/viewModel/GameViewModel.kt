@@ -5,6 +5,7 @@ import android.os.Build
 import android.os.CountDownTimer
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.util.Log
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.ViewModel
@@ -36,6 +37,7 @@ class GameViewModel @Inject constructor(
     private val coroutineDispatcher: CoroutineDispatcher,
     @ApplicationContext private val context: Context,
     private val settingsViewModel: SettingsViewModel,
+    private val loginViewModel: LoginViewModel,
 ) : ViewModel() {
 
     private val _gameState = MutableStateFlow<GameState?>(null)
@@ -93,7 +95,7 @@ class GameViewModel @Inject constructor(
         timer = object : CountDownTimer(delayTime, 100L) {
             override fun onTick(millisUntilFinished: Long) {}
             override fun onFinish() {
-                endGame(true)
+                endGame(true)  // Timer ran out, handle as a loss
             }
         }.start()
         startTime = System.currentTimeMillis()
@@ -124,7 +126,7 @@ class GameViewModel @Inject constructor(
         val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
 
         if (currentGameState.round > 10 && reactionTime > calculateDynamicTimeLimit()) {
-            endGame(true)
+            endGame(true)  // Timer ran out
             return
         }
 
@@ -158,7 +160,7 @@ class GameViewModel @Inject constructor(
             if (hapticEnabled) {
                 vibrator.vibrate(longArrayOf(0, 30, 60, 30, 60, 30), -1)
             }
-            handleIncorrectDotClick()
+            handleIncorrectDotClick()  // Player clicked the wrong dot
         }
     }
 
@@ -168,7 +170,7 @@ class GameViewModel @Inject constructor(
         if (currentGameState.round <= 5) {
             endGame(false, ignoreReactionTime = true)
         } else {
-            endGame(false, ignoreReactionTime = false)
+            endGame(false, ignoreReactionTime = false)  // Penalize for incorrect click
         }
     }
 
@@ -296,6 +298,7 @@ class GameViewModel @Inject constructor(
             status = GameStatus.GAME_OVER
         )
 
+        // Haptic feedback when the timer runs out
         val hapticEnabled = runBlocking {
             settingsViewModel.hapticFeedbackEnabled.first()
         }
@@ -313,119 +316,67 @@ class GameViewModel @Inject constructor(
             }
         }
 
+        // Save the game result and calculate the Elo score only after round 5
         viewModelScope.launch(Dispatchers.IO) {
-            val userId = repository.getGooglePlayAccountId()
-            val user = repository.getUserData(userId)
-
-            // Ensure user data is available and apply conditions for Elo update
-            if (user != null && !ignoreReactionTime && currentGameState.round > 5) {
-                val minScoreThreshold = user.averageScore * 0.7 // 70% of the user's average score
-
-                if (currentGameState.score >= minScoreThreshold) {
-                    // Save the game results and calculate the Elo score
-                    saveGameResultToFirebase(currentGameState.score, avgReactionTime)
-                    if (gamesPlayed >= 10) {
-                        calculateAndUpdateEloScore(currentGameState.score, avgReactionTime)
-                    }
-                } else {
-                    // Apply a progressive Elo penalty for score and reaction time
-                    val eloPenalty = calculateProgressiveEloPenalty(
-                        user,
-                        currentGameState.score,
-                        avgReactionTime
+            if (currentGameState.round > 5) {
+                try {
+                    val userId = loginViewModel.userId.value ?: return@launch
+                    val gameData = GameData(
+                        score = currentGameState.score,
+                        reactionTime = avgReactionTime
                     )
-                    repository.updateUserEloScore(userId, user.eloScore - eloPenalty)
+
+                    // Save game results in Firestore
+                    repository.saveGameResult(userId, gameData)
+
+                    // Fetch user data from Firestore
+                    val user = repository.getUserData(userId) ?: return@launch
+
+                    // Apply Elo calculation or penalty
+                    val newEloScore = calculateEloScoreWithPenalty(user, currentGameState.score, avgReactionTime, currentGameState.round, timerRanOut)
+                    repository.updateUserEloScore(userId, newEloScore)
+                } catch (e: Exception) {
+                    Log.e("GameViewModel", "Error saving game result or updating Elo score: ${e.localizedMessage}")
                 }
             }
         }
     }
 
-    private suspend fun saveGameResultToFirebase(score: Int, reactionTime: Long) {
-        val userId = repository.getGooglePlayAccountId()
-        if (_gameState.value?.round ?: 0 <= 5 && score == 0) {
-            return
-        }
-        val gameData = GameData(score = score, reactionTime = reactionTime)
-        repository.saveGameResult(userId, gameData)
-    }
-
-    private suspend fun calculateAndUpdateEloScore(lastGameScore: Int, lastGameReactionTime: Long) {
-        val userId = repository.getGooglePlayAccountId()
-        val user = repository.getUserData(userId) ?: return
-
-        // Calculate the new Elo score based on the last game and user data
-        val newEloScore = calculateEloScore(user, lastGameScore, lastGameReactionTime)
-
-        // Update the user's Elo score in Firestore
-        repository.updateUserEloScore(userId, newEloScore)
-    }
-
-    private fun calculateEloScore(user: User, lastGameScore: Int, lastGameReactionTime: Long): Int {
-        // Elo scoring based on key factors: avgReactionTime, averageScore, maxScore
-        val weightReactionTime = 0.6f  // Reaction time still has the most weight
-        val weightAverageScore = 0.3f  // Average score weight increased
-        val weightMaxScore = 0.1f      // Max score still has the least weight
-
-        // Ensure we only boost reaction time if the player actually scored well
-        val reactionTimeImprovementFactor =
-            (user.avgReactionTime.toDouble() / lastGameReactionTime).coerceAtLeast(0.1)
-        val scoreImprovementFactor =
-            (lastGameScore.toFloat() / user.averageScore).coerceAtLeast(0.5f)
-        val maxScoreFactor = (user.maxScore.toFloat() / lastGameScore).coerceAtLeast(0.5f)
-
-        // Balanced performance factor based on score and reaction time
-        val performanceFactor = (
-                (reactionTimeImprovementFactor * weightReactionTime) +
-                        (scoreImprovementFactor * weightAverageScore) +
-                        (maxScoreFactor * weightMaxScore)
-                )
-
-        // Games played factor (less important but cumulative)
-        val gamesPlayedFactor = user.gamesPlayed * 10
-
-        // Elo adjustment (positive or negative based on performance)
-        val eloAdjustment = if (performanceFactor > 1.0f) {
-            ((performanceFactor - 1.0f) * 100).toInt()
-        } else {
-            ((1.0f - performanceFactor) * -100).toInt()
-        }
-
-        // Final Elo score adjustment
-        return user.eloScore + eloAdjustment + gamesPlayedFactor
-    }
-
-    private fun calculateProgressiveEloPenalty(
+    private fun calculateEloScoreWithPenalty(
         user: User,
         lastGameScore: Int,
         lastGameReactionTime: Long,
+        roundsPlayed: Int,
+        timerRanOut: Boolean
     ): Int {
-        // Progressive penalty if the user performed worse than their average score
-        val scoreDeficit = user.averageScore - lastGameScore
+        var newEloScore = user.eloScore
 
-        // Penalty for score deficit
-        val scorePenalty = if (scoreDeficit > 0) {
+        // Penalize if the score is lower than average or if time ran out
+        if (lastGameScore < user.averageScore || timerRanOut) {
+            val scoreDeficit = user.averageScore - lastGameScore
             val deficitPercentage = scoreDeficit.toFloat() / user.averageScore
-            val basePenalty = 50 // Minimum penalty for scoring below average
-            val progressiveScorePenalty = (basePenalty + (deficitPercentage * 150)).toInt()
-            progressiveScorePenalty
-        } else {
-            0
+            val scorePenalty = (50 + (deficitPercentage * 150)).toInt()
+            newEloScore -= scorePenalty
         }
 
-        // Penalty if the reaction time is worse than the average
-        val reactionTimeDeficit = lastGameReactionTime - user.avgReactionTime
-        val reactionTimePenalty = if (reactionTimeDeficit > 0) {
-            val reactionTimePenaltyFactor = (reactionTimeDeficit.toFloat() / user.avgReactionTime)
-            val baseReactionTimePenalty = 50 // Minimum penalty for slower reaction times
-            val progressiveReactionPenalty =
-                (baseReactionTimePenalty + (reactionTimePenaltyFactor * 150)).toInt()
-            progressiveReactionPenalty
-        } else {
-            0
+        // Penalize if the reaction time is worse than the average and rounds played are more than user's games played
+        if (lastGameReactionTime > user.avgReactionTime && roundsPlayed > user.gamesPlayed) {
+            val reactionTimeDeficit = lastGameReactionTime - user.avgReactionTime
+            val reactionTimePenaltyFactor = reactionTimeDeficit.toFloat() / user.avgReactionTime
+            val reactionTimePenalty = (50 + (reactionTimePenaltyFactor * 150)).toInt()
+            newEloScore -= reactionTimePenalty
         }
 
-        // Combine both penalties
-        return scorePenalty + reactionTimePenalty
+        // Reward if both score and reaction time improve
+        if (lastGameScore > user.averageScore && lastGameReactionTime < user.avgReactionTime) {
+            val scoreImprovementFactor = (lastGameScore.toFloat() / user.averageScore).coerceAtLeast(1.0f)
+            val reactionTimeImprovementFactor = (user.avgReactionTime.toDouble() / lastGameReactionTime).coerceAtLeast(1.0)
+            val performanceFactor = (reactionTimeImprovementFactor * 0.6) + (scoreImprovementFactor * 0.4)
+            val performanceBoost = ((performanceFactor - 1.0) * 100).toInt()
+            newEloScore += performanceBoost
+        }
+
+        return newEloScore.coerceAtLeast(0)
     }
-
 }
+

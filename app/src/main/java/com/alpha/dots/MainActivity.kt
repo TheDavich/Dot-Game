@@ -1,15 +1,24 @@
 package com.alpha.dots
 
+import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
@@ -24,35 +33,37 @@ class MainActivity : ComponentActivity() {
 
     private val loginViewModel: LoginViewModel by viewModels()
 
+    private lateinit var signInLauncher: ActivityResultLauncher<Intent>
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val signInLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        // Register the launcher for Google Sign-In
+        signInLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             loginViewModel.handleSignInResult(
                 result,
                 onSuccess = { account ->
-                    // Handle successful sign-in
+                    val userId = account.id ?: ""
+                    loginViewModel.setUserId(userId) // Store userId in ViewModel
+                    Toast.makeText(this, "Sign-in successful!", Toast.LENGTH_SHORT).show()
                 },
                 onError = { e ->
-                    // Handle error
+                    Toast.makeText(this, "Sign-in failed: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
                 }
             )
         }
-
-        // Automatically trigger Google Sign-In
-        loginViewModel.signInWithGoogle(signInLauncher)
 
         setContent {
             DotTheme {
                 val navController = rememberNavController()
                 Scaffold(
-                    modifier = Modifier
-                        .fillMaxSize(),
+                    modifier = Modifier.fillMaxSize(),
                     containerColor = Color.Black
                 ) { innerPadding ->
                     AppNavigation(
                         modifier = Modifier.padding(innerPadding),
-                        navController = navController
+                        navController = navController,
+                        signInLauncher = signInLauncher
                     )
                 }
             }

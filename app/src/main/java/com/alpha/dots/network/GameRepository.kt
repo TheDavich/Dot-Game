@@ -28,17 +28,12 @@ class GameRepository @Inject constructor(
 
     private val userCollection = firebaseFirestore.collection("users")
 
-    // Authentication methods
-    suspend fun signInWithGoogle(idToken: String): String {
-        val credential = GoogleAuthProvider.getCredential(idToken, null)
-        val authResult = firebaseAuth.signInWithCredential(credential).await()
-        return authResult.user?.uid ?: throw Exception("Authentication failed")
-    }
-
+    // Method to get the current user ID
     suspend fun getGooglePlayAccountId(): String {
         return firebaseAuth.currentUser?.uid ?: throw Exception("User is not authenticated")
     }
 
+    // Method to get user data
     suspend fun getUserData(userId: String): User? {
         val userDocument = userCollection.document(userId).get().await()
         return userDocument.toObject(User::class.java)
@@ -52,11 +47,7 @@ class GameRepository @Inject constructor(
         if (user != null) {
             val newTotalScore = user.totalScore + gameData.score
             val newGamesPlayed = user.gamesPlayed + 1
-
-            // Calculate new average score
             val newAverageScore = newTotalScore / newGamesPlayed
-
-            // Determine if this game has the new max score
             val newMaxScore = maxOf(user.maxScore, gameData.score)
 
             // Update average reaction time
@@ -72,6 +63,7 @@ class GameRepository @Inject constructor(
                 averageScore = newAverageScore
             )
 
+            // Save the updated user data back to Firestore
             userCollection.document(userId).set(updatedUser).await()
         } else {
             // Create a new user entry if none exists
@@ -87,9 +79,10 @@ class GameRepository @Inject constructor(
         }
     }
 
-    // Method to update user's Elo score in Firestore
+    // Method to update Elo score in Firestore
     suspend fun updateUserEloScore(userId: String, newEloScore: Int) {
         userCollection.document(userId).update("eloScore", newEloScore).await()
     }
 }
+
 

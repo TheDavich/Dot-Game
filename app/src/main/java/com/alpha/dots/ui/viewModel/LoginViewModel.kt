@@ -15,7 +15,10 @@ import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.firestore.FirebaseFirestore
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
@@ -24,15 +27,22 @@ import javax.inject.Inject
 class LoginViewModel @Inject constructor(
     application: Application,
     private val firebaseAuth: FirebaseAuth,
-    private val firebaseDatabase: FirebaseDatabase
+    private val firebaseFirestore: FirebaseFirestore,
 ) : AndroidViewModel(application) {
 
+    private val _userId = MutableStateFlow<String?>(null)
+    val userId: StateFlow<String?> = _userId
+
     private val googleSignInOptions = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-        .requestIdToken(application.getString(R.string.default_web_client_id)) // Your web client ID
+        .requestIdToken(application.getString(R.string.default_web_client_id))
         .requestEmail()
         .build()
 
     private val googleSignInClient = GoogleSignIn.getClient(application, googleSignInOptions)
+
+    fun isUserLoggedIn(): Boolean {
+        return firebaseAuth.currentUser != null
+    }
 
     fun signInWithGoogle(launcher: ActivityResultLauncher<Intent>) {
         val signInIntent = googleSignInClient.signInIntent
@@ -49,19 +59,15 @@ class LoginViewModel @Inject constructor(
         }
     }
 
+
     private fun firebaseAuthWithGoogle(account: GoogleSignInAccount, onSuccess: (GoogleSignInAccount) -> Unit) {
         val credential = GoogleAuthProvider.getCredential(account.idToken, null)
         viewModelScope.launch {
             try {
                 val authResult = firebaseAuth.signInWithCredential(credential).await()
                 val user = authResult.user
-
-                if (user != null) {
-                    // Save user data to Firebase Database if needed
-                    val userRef = firebaseDatabase.getReference("users").child(user.uid)
-                    val newUser = User(id = user.uid)
-                    userRef.setValue(newUser)
-
+                user?.let {
+                    _userId.value = it.uid // Store the userId after successful sign-in
                     onSuccess(account)
                 }
             } catch (e: Exception) {
@@ -70,8 +76,12 @@ class LoginViewModel @Inject constructor(
         }
     }
 
+    fun setUserId(userId: String) {
+        _userId.value = userId
+    }
+
     fun signOut() {
         firebaseAuth.signOut()
-        googleSignInClient.signOut()
+        _userId.value = null // Reset the userId when signed out
     }
 }
