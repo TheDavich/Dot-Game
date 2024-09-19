@@ -41,7 +41,7 @@ fun MainMenu(
     loginViewModel: LoginViewModel = hiltViewModel()
 ) {
     var showLoginDialog by remember { mutableStateOf(false) }
-    val userId by loginViewModel.userId.collectAsState() // Observe the login state
+    val userId by loginViewModel.userId.collectAsState()
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -86,6 +86,7 @@ fun MainMenu(
         )
     }
 }
+
 
 
 @Composable
@@ -137,6 +138,7 @@ fun MainMenuScreenContent(
         )
     }
 }
+
 
 
 

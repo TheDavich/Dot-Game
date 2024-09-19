@@ -53,6 +53,17 @@ class MainActivity : ComponentActivity() {
             )
         }
 
+        // Check for an existing Google Sign-In or request sign-in
+        loginViewModel.checkForExistingSignIn(
+            onSignInRequired = {
+                // Automatically launch Google Sign-In if the user hasn't signed in yet
+                loginViewModel.signInWithGoogle(signInLauncher)
+            },
+            onSignedIn = {
+                Toast.makeText(this, "Welcome back!", Toast.LENGTH_SHORT).show()
+            }
+        )
+
         setContent {
             DotTheme {
                 val navController = rememberNavController()
@@ -70,6 +81,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
 
 
 

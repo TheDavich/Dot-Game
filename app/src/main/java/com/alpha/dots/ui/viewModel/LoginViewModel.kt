@@ -27,7 +27,7 @@ import javax.inject.Inject
 class LoginViewModel @Inject constructor(
     application: Application,
     private val firebaseAuth: FirebaseAuth,
-    private val firebaseFirestore: FirebaseFirestore,
+    private val firebaseFirestore: FirebaseFirestore
 ) : AndroidViewModel(application) {
 
     private val _userId = MutableStateFlow<String?>(null)
@@ -40,10 +40,21 @@ class LoginViewModel @Inject constructor(
 
     private val googleSignInClient = GoogleSignIn.getClient(application, googleSignInOptions)
 
+    // Check if user is already signed in on app launch
+    fun checkForExistingSignIn(onSignInRequired: () -> Unit, onSignedIn: () -> Unit) {
+        if (isUserLoggedIn()) {
+            _userId.value = firebaseAuth.currentUser?.uid
+            onSignedIn()
+        } else {
+            onSignInRequired()
+        }
+    }
+
     fun isUserLoggedIn(): Boolean {
         return firebaseAuth.currentUser != null
     }
 
+    // Automatically sign in the user when launching the app for the first time
     fun signInWithGoogle(launcher: ActivityResultLauncher<Intent>) {
         val signInIntent = googleSignInClient.signInIntent
         launcher.launch(signInIntent)
@@ -58,7 +69,6 @@ class LoginViewModel @Inject constructor(
             onError(e)
         }
     }
-
 
     private fun firebaseAuthWithGoogle(account: GoogleSignInAccount, onSuccess: (GoogleSignInAccount) -> Unit) {
         val credential = GoogleAuthProvider.getCredential(account.idToken, null)
@@ -85,3 +95,4 @@ class LoginViewModel @Inject constructor(
         _userId.value = null // Reset the userId when signed out
     }
 }
+
