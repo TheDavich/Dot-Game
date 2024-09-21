@@ -1,7 +1,8 @@
 package com.alpha.dots.model
 
 data class User(
-    val id: String = "",
+    val id: String = "", // Firebase Auth user ID (remains constant)
+    val username: String = "", // Nickname (can be updated)
     val totalScore: Int = 0,
     val avgReactionTime: Long = 0L,
     val gamesPlayed: Int = 0,
@@ -9,3 +10,4 @@ data class User(
     val maxScore: Int = 0,
     val averageScore: Int = 0
 )
+

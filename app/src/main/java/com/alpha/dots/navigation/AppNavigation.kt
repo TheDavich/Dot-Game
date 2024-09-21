@@ -13,11 +13,14 @@ import androidx.navigation.compose.composable
 import com.alpha.dots.ui.screens.GameOverScreen
 import com.alpha.dots.ui.screens.GameScreen
 import com.alpha.dots.ui.screens.MainMenu
+import com.alpha.dots.ui.screens.RankingScreen
 import com.alpha.dots.ui.screens.SettingsScreen
 import com.alpha.dots.ui.viewModel.GameViewModel
 import com.alpha.dots.ui.viewModel.LoginViewModel
+import com.alpha.dots.ui.viewModel.RankingViewModel
 import com.alpha.dots.ui.viewModel.SettingsViewModel
 import com.alpha.dots.util.MAIN_MENU_SCREEN
+import com.alpha.dots.util.RANKING_SCREEN
 import com.alpha.dots.util.SETTINGS_SCREEN
 import com.alpha.dots.util.SINGLE_PLAYER_GAME_OVER_SCREEN
 import com.alpha.dots.util.SINGLE_PLAYER_GAME_SCREEN
@@ -31,6 +34,7 @@ fun AppNavigation(
     val viewModel: GameViewModel = hiltViewModel()
     val settingsViewModel: SettingsViewModel = hiltViewModel()
     val loginViewModel: LoginViewModel = hiltViewModel()
+    val rankingViewModel: RankingViewModel = hiltViewModel()
     NavHost(
         navController = navController,
         startDestination = MAIN_MENU_SCREEN,
@@ -78,6 +82,16 @@ fun AppNavigation(
         ) {
             SettingsScreen(
                 viewModel = settingsViewModel,
+                gameViewModel = viewModel
+            )
+        }
+        composable(
+            route = RANKING_SCREEN,
+            enterTransition = {EnterTransition.None} ,
+            exitTransition = {ExitTransition.None} ,
+        ) {
+            RankingScreen(
+                rankingViewModel = rankingViewModel
             )
         }
     }

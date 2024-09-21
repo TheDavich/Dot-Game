@@ -1,17 +1,29 @@
 package com.alpha.dots.ui.screens
 
 import android.content.Intent
+import android.util.Log
+import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -20,15 +32,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
+import com.alpha.dots.ui.composables.SetUsernameDialog
 import com.alpha.dots.ui.composables.UniversalButton
 import com.alpha.dots.ui.viewModel.GameViewModel
 import com.alpha.dots.ui.viewModel.LoginViewModel
-import com.alpha.dots.util.MULTIPLAYER_GAME_SCREEN
+import com.alpha.dots.util.RANKING_SCREEN
 import com.alpha.dots.util.SETTINGS_SCREEN
 import com.alpha.dots.util.SINGLE_PLAYER_GAME_SCREEN
 
@@ -38,10 +53,12 @@ fun MainMenu(
     navController: NavHostController,
     signInLauncher: ActivityResultLauncher<Intent>,
     modifier: Modifier = Modifier,
-    loginViewModel: LoginViewModel = hiltViewModel()
+    loginViewModel: LoginViewModel = hiltViewModel(),
 ) {
     var showLoginDialog by remember { mutableStateOf(false) }
-    val userId by loginViewModel.userId.collectAsState()
+    var showUsernameDialog by remember { mutableStateOf(false) }
+    val userId by loginViewModel.userId.collectAsState(initial = null)
+    val currentUser by viewModel.currentUser.collectAsState()
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -68,7 +85,10 @@ fun MainMenu(
     ) { innerPadding ->
         MainMenuScreenContent(
             onSinglePlayerClicked = {
-                if (userId != null) {
+                if (currentUser?.username.isNullOrEmpty()) {
+                    // Show dialog to set username if it's empty
+                    showUsernameDialog = true
+                } else if (userId != null) {
                     viewModel.resetGameState()
                     navController.navigate(SINGLE_PLAYER_GAME_SCREEN)
                 } else {
@@ -76,18 +96,16 @@ fun MainMenu(
                 }
             },
             showAlertDialog = showLoginDialog,
-            onDismissDialog = {
-                showLoginDialog = false
-            },
-            onLaunchGoogleSignIn = {
-                loginViewModel.signInWithGoogle(signInLauncher)
-            },
-            modifier = modifier.padding(innerPadding)
+            onDismissDialog = { showLoginDialog = false },
+            onLaunchGoogleSignIn = { loginViewModel.signInWithGoogle(signInLauncher) },
+            modifier = modifier.padding(innerPadding),
+            onRankingClicked = { navController.navigate(RANKING_SCREEN) },
+            showUsernameDialog = showUsernameDialog,
+            onDismissUsernameDialog = { showUsernameDialog = false },  // Properly dismiss the dialog
+            gameViewModel = viewModel
         )
     }
 }
-
-
 
 @Composable
 fun MainMenuScreenContent(
@@ -95,7 +113,11 @@ fun MainMenuScreenContent(
     showAlertDialog: Boolean,
     onDismissDialog: () -> Unit,
     onLaunchGoogleSignIn: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onRankingClicked: () -> Unit,
+    showUsernameDialog: Boolean,
+    onDismissUsernameDialog: () -> Unit,  // Dismiss dialog callback
+    gameViewModel: GameViewModel,
 ) {
     Column(
         modifier = modifier
@@ -132,15 +154,17 @@ fun MainMenuScreenContent(
 
         UniversalButton(
             text = "Rankings",
-            onClick = {
-                // Handle Rankings click
-            }
+            onClick = onRankingClicked
         )
+
+        if (showUsernameDialog) {
+            SetUsernameDialog(
+                gameViewModel = gameViewModel,
+                onDismissRequest = onDismissUsernameDialog // Pass dismiss function
+            )
+        }
     }
 }
-
-
-
 
 
 
@@ -151,6 +175,10 @@ fun MainMenuPreview() {
         onSinglePlayerClicked = { /* Handle singleplayer click */ },
         showAlertDialog = true,
         onDismissDialog = { /* Handle dismiss dialog */ },
-        onLaunchGoogleSignIn = { /* Handle Google sign-in */ }
+        onLaunchGoogleSignIn = { /* Handle Google sign-in */ },
+        onRankingClicked = {},
+        showUsernameDialog = true,
+        onDismissUsernameDialog = { /* Handle dismiss username dialog */ },
+        gameViewModel = hiltViewModel()
     )
 }

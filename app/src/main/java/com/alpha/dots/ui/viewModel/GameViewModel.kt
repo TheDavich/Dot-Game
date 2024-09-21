@@ -53,7 +53,12 @@ class GameViewModel @Inject constructor(
 
     private var timer: CountDownTimer? = null
 
+    private val _currentUser = MutableStateFlow<User?>(null)
+    val currentUser: StateFlow<User?> = _currentUser
+
     init {
+        observeSignIn()
+        observeUserUpdates()
         resetGameState()
     }
 
@@ -87,6 +92,28 @@ class GameViewModel @Inject constructor(
             resetTimer()
         }
     }
+
+    private fun observeSignIn() {
+        viewModelScope.launch {
+            loginViewModel.userId.collect { userId ->
+                if (userId != null) {
+                    loadCurrentUser(userId) // Ensure user is loaded after sign-in
+                }
+            }
+        }
+    }
+
+    fun observeUserUpdates() {
+        viewModelScope.launch {
+            loginViewModel.currentUser.collect { user ->
+                if (user != null) {
+                    Log.d("GameViewModel", "User data received: ${user.username}")
+                    _currentUser.value = user
+                }
+            }
+        }
+    }
+
 
     private fun resetTimer() {
         timer?.cancel()
@@ -316,7 +343,6 @@ class GameViewModel @Inject constructor(
             }
         }
 
-        // Save the game result and calculate the Elo score only after round 5
         viewModelScope.launch(Dispatchers.IO) {
             if (currentGameState.round > 5) {
                 try {
@@ -342,6 +368,19 @@ class GameViewModel @Inject constructor(
         }
     }
 
+    fun loadCurrentUser(userId: String) {
+        viewModelScope.launch {
+            try {
+                _currentUser.value = repository.getUserData(userId)
+                Log.d("GameViewModel", "User loaded: ${_currentUser.value?.username}")
+            } catch (e: Exception) {
+                Log.e("GameViewModel", "Failed to load user: ${e.localizedMessage}")
+            }
+        }
+    }
+
+
+
     private fun calculateEloScoreWithPenalty(
         user: User,
         lastGameScore: Int,
@@ -351,32 +390,71 @@ class GameViewModel @Inject constructor(
     ): Int {
         var newEloScore = user.eloScore
 
-        // Penalize if the score is lower than average or if time ran out
-        if (lastGameScore < user.averageScore || timerRanOut) {
+        // **Penalty 1: Severe time-out or extremely poor performance**
+        // If the score is significantly below average or the timer ran out.
+        if (lastGameScore < user.averageScore * 0.6 || timerRanOut) {
             val scoreDeficit = user.averageScore - lastGameScore
-            val deficitPercentage = scoreDeficit.toFloat() / user.averageScore
-            val scorePenalty = (50 + (deficitPercentage * 150)).toInt()
-            newEloScore -= scorePenalty
+            val deficitPercentage = (scoreDeficit.toFloat() / user.averageScore).coerceAtMost(1.0f)
+            val timePenalty = (deficitPercentage * 100).toInt()  // Moderate penalty based on score deficit
+            newEloScore -= timePenalty
         }
 
-        // Penalize if the reaction time is worse than the average and rounds played are more than user's games played
-        if (lastGameReactionTime > user.avgReactionTime && roundsPlayed > user.gamesPlayed) {
-            val reactionTimeDeficit = lastGameReactionTime - user.avgReactionTime
-            val reactionTimePenaltyFactor = reactionTimeDeficit.toFloat() / user.avgReactionTime
-            val reactionTimePenalty = (50 + (reactionTimePenaltyFactor * 150)).toInt()
-            newEloScore -= reactionTimePenalty
+        // **Penalty 2: Extreme inconsistency between reaction time and score**
+        // Prevent reaction time abuse: faster-than-usual reaction time but poor score.
+        if (lastGameReactionTime < user.avgReactionTime * 0.8 && lastGameScore < user.averageScore * 0.7) {
+            val reactionFactor = (user.avgReactionTime.toDouble() / lastGameReactionTime).coerceAtLeast(1.0)
+            val abusePenalty = ((reactionFactor - 1.0) * 100).toInt()  // Smaller abuse penalty than before
+            newEloScore -= abusePenalty
         }
 
-        // Reward if both score and reaction time improve
+        // **Reward 1: Consistency and significant improvement**
+        // If the player improves both score and reaction time beyond their averages.
         if (lastGameScore > user.averageScore && lastGameReactionTime < user.avgReactionTime) {
             val scoreImprovementFactor = (lastGameScore.toFloat() / user.averageScore).coerceAtLeast(1.0f)
             val reactionTimeImprovementFactor = (user.avgReactionTime.toDouble() / lastGameReactionTime).coerceAtLeast(1.0)
-            val performanceFactor = (reactionTimeImprovementFactor * 0.6) + (scoreImprovementFactor * 0.4)
-            val performanceBoost = ((performanceFactor - 1.0) * 100).toInt()
+            val improvementFactor = (reactionTimeImprovementFactor * 0.6) + (scoreImprovementFactor * 0.4)  // 60% reaction, 40% score
+            val performanceBoost = ((improvementFactor - 1.0) * 150).toInt()  // Slightly larger performance boost
             newEloScore += performanceBoost
         }
 
+        // **Reward 2: Small improvements should be rewarded**
+        // Give slight increases even if the player shows minor improvements in one area.
+        else if (lastGameScore > user.averageScore * 1.1 || lastGameReactionTime < user.avgReactionTime * 0.9) {
+            val slightImprovementBoost = (20..50).random()  // A smaller random boost to keep it engaging
+            newEloScore += slightImprovementBoost
+        }
+
+        // **Penalty 3: Excessive reaction time for high scores**
+        // Penalize if the player’s reaction time is much worse than their average but their score is higher.
+        if (lastGameScore > user.averageScore && lastGameReactionTime > user.avgReactionTime * 1.3) {
+            val reactionTimeDeficit = lastGameReactionTime - user.avgReactionTime
+            val reactionPenalty = ((reactionTimeDeficit.toFloat() / user.avgReactionTime) * 70).toInt()
+            newEloScore -= reactionPenalty
+        }
+
+        // **Reward 3: Consistent improvement across games**
+        // Players who perform consistently above average should gain more Elo over time.
+        if (lastGameScore >= user.averageScore * 1.2 && lastGameReactionTime <= user.avgReactionTime * 0.9) {
+            val consistencyBonus = 40 + (lastGameScore - user.averageScore) / 10  // Scales with performance
+            newEloScore += consistencyBonus
+        }
+
+        // Ensure the Elo score does not drop below 0.
         return newEloScore.coerceAtLeast(0)
     }
-}
 
+
+    fun changeNickname(newNickname: String, onNicknameTaken: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val isTaken = repository.isNicknameTaken(newNickname)
+            if (!isTaken) {
+                val user = _currentUser.value ?: return@launch
+                repository.updateUserUsername(user.id, newNickname)
+                _currentUser.value = user.copy(username = newNickname) // Update user with new username
+                onNicknameTaken(false) // Success
+            } else {
+                onNicknameTaken(true) // Username is taken
+            }
+        }
+    }
+}
