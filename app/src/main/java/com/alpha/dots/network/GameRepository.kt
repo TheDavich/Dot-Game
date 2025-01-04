@@ -10,7 +10,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
-class GameRepository @Inject constructor(
+internal class GameRepository @Inject constructor(
     private val firebaseFirestore: FirebaseFirestore,
     private val firebaseAuth: FirebaseAuth,
     @ApplicationContext private val context: Context,
@@ -22,7 +22,6 @@ class GameRepository @Inject constructor(
     suspend fun getGooglePlayAccountId(): String? {
         return firebaseAuth.currentUser?.uid
     }
-
 
     suspend fun getAllUsers(): List<User> {
         val querySnapshot = userCollection.get().await()
@@ -89,7 +88,6 @@ class GameRepository @Inject constructor(
         userCollection.document(userId).update("eloScore", newEloScore).await()
     }
 
-
     suspend fun getUserData(userId: String): User? {
         return try {
             val userDocument = userCollection.document(userId).get().await()
@@ -119,7 +117,3 @@ class GameRepository @Inject constructor(
         }
     }
 }
-
-
-
-

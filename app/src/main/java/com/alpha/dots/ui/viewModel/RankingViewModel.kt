@@ -1,6 +1,5 @@
 package com.alpha.dots.ui.viewModel
 
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.alpha.dots.model.User
@@ -12,7 +11,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class RankingViewModel @Inject constructor(
+internal class RankingViewModel @Inject constructor(
     private val repository: GameRepository
 ) : ViewModel() {
 

@@ -1,5 +1,6 @@
 package com.alpha.dots.ui.viewModel
 
+import android.app.Activity
 import android.content.Context
 import android.os.Build
 import android.os.CountDownTimer
@@ -16,9 +17,13 @@ import com.alpha.dots.model.GameState
 import com.alpha.dots.model.User
 import com.alpha.dots.model.dotsColors
 import com.alpha.dots.network.GameRepository
+import com.alpha.dots.util.GAME_OVER_AD_ID
 import com.alpha.dots.util.GameStatus
+import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.LoadAdError
+import com.google.android.gms.ads.interstitial.InterstitialAd
+import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,10 +37,9 @@ import kotlin.math.sqrt
 import kotlin.random.Random
 
 @HiltViewModel
-class GameViewModel @Inject constructor(
+internal class GameViewModel @Inject constructor(
     private val repository: GameRepository,
     private val coroutineDispatcher: CoroutineDispatcher,
-    @ApplicationContext private val context: Context,
     private val settingsViewModel: SettingsViewModel,
     private val loginViewModel: LoginViewModel,
 ) : ViewModel() {
@@ -62,6 +66,62 @@ class GameViewModel @Inject constructor(
         resetGameState()
     }
 
+    private var interstitialAd: InterstitialAd? = null
+    private var gamesLost = 0
+
+    // Load an Interstitial ad
+    fun loadInterstitialAd(activity: Activity) {
+        val adRequest = AdRequest.Builder().build()
+        InterstitialAd
+            .load(activity, GAME_OVER_AD_ID, adRequest,
+                object : InterstitialAdLoadCallback() {
+                    override fun onAdLoaded(ad: InterstitialAd) {
+                        interstitialAd = ad
+                        Log.d("GameViewModel", "Interstitial ad successfully loaded.")
+                    }
+
+                    override fun onAdFailedToLoad(adError: LoadAdError) {
+                        Log.e("GameViewModel", "Interstitial ad failed to load: ${adError.message}, Code: ${adError.code}, Domain: ${adError.domain}")
+                        interstitialAd = null
+                    }
+                }
+            )
+    }
+
+
+
+
+    private fun showInterstitialAd(activity: Activity) {
+        if (interstitialAd != null) {
+            Log.d("GameViewModel", "Showing interstitial ad.")
+            interstitialAd?.show(activity)
+
+            // Immediately set to null after showing to avoid trying to show the same ad again
+            interstitialAd = null
+
+            // Reload ad after showing
+            loadInterstitialAd(activity)
+        } else {
+            Log.e("GameViewModel", "Interstitial ad not loaded. Attempting to reload.")
+            loadInterstitialAd(activity)
+        }
+    }
+
+
+
+
+    fun incrementGamesLost(activity: Activity) {
+        gamesLost++
+        Log.d("GameViewModel", "Games lost incremented to: $gamesLost")
+
+        if (gamesLost >= 3) {
+            Log.d("GameViewModel", "3 games lost. Attempting to show interstitial ad.")
+            showInterstitialAd(activity)
+            gamesLost = 0 // Reset counter after showing the ad
+        }
+    }
+
+
     fun resetGameState() {
         _gameState.value = GameState(
             dots = emptyList(),
@@ -78,7 +138,7 @@ class GameViewModel @Inject constructor(
         timer?.cancel()
     }
 
-    fun startNewGame() {
+    fun startNewGame(activity: Activity) {
         if (_gameState.value?.status == GameStatus.STOPPED) {
             resetGameState()
 
@@ -89,9 +149,14 @@ class GameViewModel @Inject constructor(
                 timeLeft = 3000L,
                 status = GameStatus.STARTED
             )
-            resetTimer()
+            resetTimer(activity)
+
+            // Load the interstitial ad at the start of each new game
+            loadInterstitialAd(activity)
         }
     }
+
+
 
     private fun observeSignIn() {
         viewModelScope.launch {
@@ -114,19 +179,19 @@ class GameViewModel @Inject constructor(
         }
     }
 
-
-    private fun resetTimer() {
+    private fun resetTimer(activity: Activity) {
         timer?.cancel()
         val currentRound = _gameState.value?.round ?: 1
         val delayTime = if (currentRound < 10) 2000L else calculateDynamicTimeLimit()
         timer = object : CountDownTimer(delayTime, 100L) {
             override fun onTick(millisUntilFinished: Long) {}
             override fun onFinish() {
-                endGame(true)  // Timer ran out, handle as a loss
+                endGame(true, activity)  // Pass activity to endGame when timer runs out
             }
         }.start()
         startTime = System.currentTimeMillis()
     }
+
 
     private fun calculateDynamicTimeLimit(): Long {
         return if (averageReactionTime > 0) {
@@ -136,7 +201,7 @@ class GameViewModel @Inject constructor(
         }
     }
 
-    fun onDotClicked(dotIndex: Int, context: Context) {
+    fun onDotClicked(dotIndex: Int, activity: Activity) {
         val currentGameState = _gameState.value ?: return
         if (dotIndex >= currentGameState.dots.size) {
             return
@@ -150,10 +215,10 @@ class GameViewModel @Inject constructor(
             settingsViewModel.hapticFeedbackEnabled.first()
         }
 
-        val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+        val vibrator = activity.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
 
         if (currentGameState.round > 10 && reactionTime > calculateDynamicTimeLimit()) {
-            endGame(true)  // Timer ran out
+            endGame(true, activity)  // Timer ran out
             return
         }
 
@@ -182,22 +247,24 @@ class GameViewModel @Inject constructor(
                 advanceRound()
             }
 
-            resetTimer()
+            resetTimer(activity)  // Pass activity here
         } else {
             if (hapticEnabled) {
                 vibrator.vibrate(longArrayOf(0, 30, 60, 30, 60, 30), -1)
             }
-            handleIncorrectDotClick()  // Player clicked the wrong dot
+            handleIncorrectDotClick(activity)  // Pass activity to handleIncorrectDotClick
         }
     }
 
-    private fun handleIncorrectDotClick() {
+
+    private fun handleIncorrectDotClick(activity: Activity) {
         val currentGameState = _gameState.value ?: return
 
+        // Mark the game as lost and handle it accordingly
         if (currentGameState.round <= 5) {
-            endGame(false, ignoreReactionTime = true)
+            endGame(false, activity, ignoreReactionTime = true)
         } else {
-            endGame(false, ignoreReactionTime = false)  // Penalize for incorrect click
+            endGame(false, activity, ignoreReactionTime = false)  // Penalize for incorrect click
         }
     }
 
@@ -302,9 +369,12 @@ class GameViewModel @Inject constructor(
         )
     }
 
-    fun endGame(timerRanOut: Boolean, ignoreReactionTime: Boolean = false) {
+    fun endGame(timerRanOut: Boolean, activity: Activity, ignoreReactionTime: Boolean = false) {
         timer?.cancel()
         timer = null
+
+        Log.d("GameViewModel", "Ending game. Timer ran out: $timerRanOut, Ignore reaction time: $ignoreReactionTime")
+
 
         val currentGameState = _gameState.value ?: return
 
@@ -329,7 +399,7 @@ class GameViewModel @Inject constructor(
         val hapticEnabled = runBlocking {
             settingsViewModel.hapticFeedbackEnabled.first()
         }
-        val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+        val vibrator = activity.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
         if (hapticEnabled && timerRanOut) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 vibrator.vibrate(
@@ -359,14 +429,27 @@ class GameViewModel @Inject constructor(
                     val user = repository.getUserData(userId) ?: return@launch
 
                     // Apply Elo calculation or penalty
-                    val newEloScore = calculateEloScoreWithPenalty(user, currentGameState.score, avgReactionTime, currentGameState.round, timerRanOut)
+                    val newEloScore = calculateEloScoreWithPenalty(
+                        user,
+                        currentGameState.score,
+                        avgReactionTime,
+                        currentGameState.round,
+                        timerRanOut
+                    )
                     repository.updateUserEloScore(userId, newEloScore)
                 } catch (e: Exception) {
                     Log.e("GameViewModel", "Error saving game result or updating Elo score: ${e.localizedMessage}")
                 }
             }
         }
+
+        // Increment lost games if the timer ran out or user clicked the wrong dot
+        if (timerRanOut || !ignoreReactionTime) {
+            Log.d("GameViewModel", "Incrementing lost games due to end of game condition.")
+            incrementGamesLost(activity)
+        }
     }
+
 
     fun loadCurrentUser(userId: String) {
         viewModelScope.launch {

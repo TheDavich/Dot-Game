@@ -2,7 +2,6 @@ package com.alpha.dots.ui.composables
 
 import android.util.Log
 import android.widget.Toast
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,7 +25,7 @@ import androidx.compose.ui.unit.dp
 import com.alpha.dots.ui.viewModel.GameViewModel
 
 @Composable
-fun SetUsernameDialog(
+internal fun SetUsernameDialog(
     gameViewModel: GameViewModel,
     onDismissRequest: () -> Unit
 ) {
@@ -97,7 +96,3 @@ fun SetUsernameDialog(
         containerColor = Color.Black
     )
 }
-
-
-
-

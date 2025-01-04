@@ -1,9 +1,8 @@
 [versions]
 accompanistSwiperefresh = "0.34.0"
-agp = "8.4.2"
+agp = "8.6.1"
 apphudsdkAndroid = "2.6.6"
 coilCompose = "2.6.0"
-converterMoshi = "2.11.0"
 coreSplashscreen = "1.0.1"
 datastorePreferences = "1.1.1"
 dotsindicator = "5.0"
@@ -18,19 +17,19 @@ espressoCore = "3.6.1"
 kotlinxCollectionsImmutable = "0.3.5"
 kotlinxSerializationJson = "1.6.2"
 kotlinxSerializationPlugin = "1.9.23"
-lifecycleRuntimeKtx = "2.8.5"
+lifecycleRuntimeKtx = "2.8.6"
 activityCompose = "1.9.2"
-composeBom = "2024.09.01"
+composeBom = "2024.09.02"
 appcompat = "1.7.0"
 lottieCompose = "6.0.0"
 material = "1.12.0"
 hiltVersion = "2.50"
-navigationCompose = "2.8.0"
+navigationCompose = "2.8.1"
 kspVersion = "2.0.0-1.0.22"
 playServicesAds = "23.3.0"
 playServicesAuth = "21.2.0"
 roomRuntime = "2.6.1"
-runtime = "1.7.1"
+runtime = "1.7.2"
 databindingAdapters = "8.6.1"
 firebaseDatabaseKtx = "21.0.0"
 firebaseAnalytics = "22.1.0"
@@ -40,6 +39,8 @@ firebaseDatabase = "21.0.0"
 firebaseAuth = "23.0.0"
 firebaseCrashlytics = "19.1.0"
 googleFirebaseCrashlytics = "3.0.2"
+playServicesAdsLite = "23.3.0"
+constraintlayout = "2.2.0"
 
 [libraries]
 accompanist-swiperefresh = { module = "com.google.accompanist:accompanist-swiperefresh", version.ref = "accompanistSwiperefresh" }
@@ -56,8 +57,6 @@ androidx-room-testing = { module = "androidx.room:room-testing", version.ref = "
 androidx-runtime = { module = "androidx.compose.runtime:runtime", version.ref = "runtime" }
 apphudsdk-android = { module = "com.apphud:ApphudSDK-Android", version.ref = "apphudsdkAndroid" }
 coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coilCompose" }
-converter-gson = { module = "com.squareup.retrofit2:converter-gson", version.ref = "converterMoshi" }
-converter-moshi = { module = "com.squareup.retrofit2:converter-moshi", version.ref = "converterMoshi" }
 dotsindicator = { module = "com.tbuonomo:dotsindicator", version.ref = "dotsindicator" }
 google-firebase-auth = { module = "com.google.firebase:firebase-auth" }
 haze = { module = "dev.chrisbanes.haze:haze", version.ref = "haze" }
@@ -84,7 +83,6 @@ hilt-android = { group = "com.google.dagger", name = "hilt-android" , version.re
 hilt-compiler = { group = "com.google.dagger", name = "hilt-compiler" , version.ref = "hiltVersion"}
 play-services-ads = { module = "com.google.android.gms:play-services-ads", version.ref = "playServicesAds" }
 play-services-auth = { module = "com.google.android.gms:play-services-auth", version.ref = "playServicesAuth" }
-retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "converterMoshi" }
 androidx-databinding-adapters = { group = "androidx.databinding", name = "databinding-adapters", version.ref = "databindingAdapters" }
 firebase-database-ktx = { group = "com.google.firebase", name = "firebase-database-ktx", version.ref = "firebaseDatabaseKtx" }
 firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics", version.ref = "firebaseAnalytics" }
@@ -92,6 +90,8 @@ firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore
 firebase-database = { group = "com.google.firebase", name = "firebase-database", version.ref = "firebaseDatabase" }
 firebase-auth = { group = "com.google.firebase", name = "firebase-auth", version.ref = "firebaseAuth" }
 firebase-crashlytics = { group = "com.google.firebase", name = "firebase-crashlytics", version.ref = "firebaseCrashlytics" }
+play-services-ads-lite = { group = "com.google.android.gms", name = "play-services-ads-lite", version.ref = "playServicesAdsLite" }
+androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
 
 
 [plugins]

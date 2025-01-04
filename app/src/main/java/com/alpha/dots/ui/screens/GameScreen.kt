@@ -1,5 +1,6 @@
 package com.alpha.dots.ui.screens
 
+import android.app.Activity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -31,45 +33,60 @@ import com.alpha.dots.model.Dot
 import com.alpha.dots.model.GameState
 import com.alpha.dots.ui.viewModel.GameViewModel
 import com.alpha.dots.ui.viewModel.SettingsViewModel
+import com.alpha.dots.util.BANNER_ID
 import com.alpha.dots.util.GameStatus
 import com.alpha.dots.util.SINGLE_PLAYER_GAME_OVER_SCREEN
 import com.alpha.dots.util.SINGLE_PLAYER_GAME_SCREEN
 import kotlin.math.sqrt
 
 @Composable
-fun GameScreen(
+internal fun GameScreen(
     viewModel: GameViewModel,
     settingsViewModel: SettingsViewModel,
     navController: NavHostController,
     modifier: Modifier = Modifier,
 ) {
     val gameState by viewModel.gameState.collectAsState()
-    val context = LocalContext.current
+    val activity = LocalContext.current as Activity
 
     LaunchedEffect(Unit) {
         viewModel.resetGameState()
-        viewModel.startNewGame()
+        viewModel.startNewGame(activity)
     }
 
-    if (gameState?.status == GameStatus.GAME_OVER) {
-        navController.navigate(SINGLE_PLAYER_GAME_OVER_SCREEN) {
-            popUpTo(SINGLE_PLAYER_GAME_SCREEN) { inclusive = true }
+    Box(modifier = modifier.fillMaxSize()) {
+        // Main content
+        if (gameState?.status == GameStatus.GAME_OVER) {
+            navController.navigate(SINGLE_PLAYER_GAME_OVER_SCREEN) {
+                popUpTo(SINGLE_PLAYER_GAME_SCREEN) { inclusive = true }
+            }
+        } else {
+            Scaffold(
+                modifier = Modifier.fillMaxSize(),
+                containerColor = Color.Black
+            ) { innerPadding ->
+                GameScreenContent(
+                    gameState = gameState,
+                    onDotClicked = { index ->
+                        viewModel.onDotClicked(index, activity)
+                    },
+                    modifier = Modifier.padding(innerPadding)
+                )
+            }
         }
-    } else {
-        Scaffold(
-            modifier = modifier.fillMaxSize(),
-            containerColor = Color.Black
-        ) { innerPadding ->
-            GameScreenContent(
-                gameState = gameState,
-                onDotClicked = { index ->
-                    viewModel.onDotClicked(index, context)
-                },
-                modifier = modifier.padding(innerPadding)
-            )
-        }
+
+        // Ad banner at the bottom
+        BannerAdView(
+            adUnitId = BANNER_ID, // Use your test ad unit ID
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .wrapContentHeight()
+        )
     }
 }
+
+
+
 
 @Composable
 fun GameScreenContent(
